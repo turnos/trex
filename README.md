@@ -26,4 +26,4 @@ Starts authentication to trakt.tv and records the oauth token in trex configfile
 Add a new webhook to Plex with the url `http://<your server>:5000/trakt_hook`  
 
 
-Forked from gazpachoking/trex
+Forked from [gazpachoking/trex](https://github.com/gazpachoking/trex)
