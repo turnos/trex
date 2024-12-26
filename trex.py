@@ -4,6 +4,7 @@ import time
 
 import click
 from flask import Flask, request, json
+from token_data import *
 import requests
 import yaml
 import os
@@ -18,26 +19,32 @@ TRAKT_API_URL = "https://api.trakt.tv/"
 SCROBBLE_START = "scrobble/start"
 SCROBBLE_PAUSE = "scrobble/pause"
 SCROBBLE_STOP = "scrobble/stop"
-CLIENT_ID = os.environ['ENV_CLIENT_ID'] #"5c22e26bdacc760154ce141ce201424be373cfc9fafd0e987953e99b5d1df5e4"
-CLIENT_SECRET = os.environ['ENV_CLIENT_SECRET'] #"614a2d5856d44e6fb8791c7ddcef9764d044d385965cfa86479430d02d422a2b"
-CONFIG_FILE_PATH = "./conf/token.yaml"
+OAUTH_TOKEN = "oauth/token"
+OAUTH_DEVICE_TOKEN = "oauth/device/token"
+OAUTH_DEVICE_CODE = "oauth/device/code"
+REDIRECT_URI = "urn:ietf:wg:oauth:2.0:oob"
+CLIENT_ID = os.environ['CLIENT_ID']
+CLIENT_SECRET = os.environ['CLIENT_SECRET']
+CONFIG_FILE_PATH = "/opt/trex/conf/token.yaml"
 HEADERS = {"trakt-api-version": "2", "trakt-api-key": CLIENT_ID}
 
 
 
 def run():
+    app.logger.setLevel("INFO")
     app.run(host="0.0.0.0")
 
 @app.route("/trakt_hook", methods=["POST"])
 def hook_receiver():
-    config = load_config()
     payload = json.loads(request.form["payload"])
     # Let's only handle the scrobble event for now.
     if payload["event"] != "media.scrobble":
         return ""
-    access_token = config["access_token"]
+    
+    access_token = get_access_token()
     if not access_token:
-        return "App is not authenticated with trakt. Please initialize authentication first on /auth"
+        return "App is not authenticated with trakt. Please initialize authentication first on /auth", 400
+    
     scrobble_object = create_scrobble_object(payload)
     if not scrobble_object:
         return "Unable to form trakt request.", 500
@@ -86,23 +93,13 @@ def create_scrobble_object(plex_payload):
     return result or None
 
 
-def load_config():
-    configfile = pathlib.Path(CONFIG_FILE_PATH)
-    with configfile.open('r') as f:
-        return yaml.safe_load(f.read())
-
-
-def save_token_data(config):
-    configfile = pathlib.Path(CONFIG_FILE_PATH)
-    with configfile.open('w') as f:
-        return yaml.dump(config, f, default_flow_style=False)
 
 @app.route("/auth", methods=["GET"])
 def authenticate():
     logger.info("Start app registration.")
     request_body = {"client_id": CLIENT_ID}
     try:
-        r = requests.post(TRAKT_API_URL + "oauth/device/code", data=request_body).json()
+        r = requests.post(TRAKT_API_URL + OAUTH_DEVICE_CODE, data=request_body).json()
 
         logger.debug("Received response %s", r)
         user_code = r["user_code"]
@@ -147,7 +144,7 @@ def poll_auth_status(device_code, interval, end_time):
         logger.info("Wait %d seconds before polling authorization status", interval)
         time.sleep(interval)
 
-        r = requests.post(TRAKT_API_URL + "oauth/device/token", data=request_body)
+        r = requests.post(TRAKT_API_URL + OAUTH_DEVICE_TOKEN, data=request_body)
         result = None
 
         if r.status_code == 200:
@@ -189,22 +186,21 @@ def poll_auth_status(device_code, interval, end_time):
 def refresh_token(token_data):
     logger.info("Refresh token")
     request_body = {
-        "refresh_token": token_data['refresh_token'],
+        "refresh_token": get_refresh_token(),
         "client_id": CLIENT_ID,
         "client_secret": CLIENT_SECRET,
         "redirect_uri": REDIRECT_URI,
         "grant_type": "refresh_token" 
     }
     try:
-        r = requests.post(TRAKT_URL + "oauth/token", data=request_body).json()
+        r = requests.post(TRAKT_API_URL + OAUTH_TOKEN, data=request_body).json()
         logger.debug("Received response: %s", r)
         save_token_data(r)
         logger.info("Saved new token")
         return True
     except requests.RequestException as e:
         logger.exception("Failed to refresh token", e)
-        
     return False
-
+    
 if __name__ == "__main__":
     run()
