@@ -1,12 +1,9 @@
-import pathlib
 import re
 import time
 
-import click
 from flask import Flask, request, json
 from token_data import *
 import requests
-import yaml
 import os
 import threading
 
@@ -14,7 +11,6 @@ import threading
 app = Flask(__name__)
 logger = app.logger
 
-VERSION = "0.9"
 TRAKT_API_URL = "https://api.trakt.tv/"
 SCROBBLE_START = "scrobble/start"
 SCROBBLE_PAUSE = "scrobble/pause"
@@ -25,7 +21,6 @@ OAUTH_DEVICE_CODE = "oauth/device/code"
 REDIRECT_URI = "urn:ietf:wg:oauth:2.0:oob"
 CLIENT_ID = os.environ['CLIENT_ID']
 CLIENT_SECRET = os.environ['CLIENT_SECRET']
-CONFIG_FILE_PATH = "/opt/trex/conf/token.yaml"
 HEADERS = {"trakt-api-version": "2", "trakt-api-key": CLIENT_ID}
 
 
@@ -41,8 +36,9 @@ def hook_receiver():
     if payload["event"] != "media.scrobble":
         return ""
     
-    access_token = get_access_token()
-    if not access_token:
+    if is_valid() and is_expired():
+        refresh_token()
+    elif not is_valid():
         return "App is not authenticated with trakt. Please initialize authentication first on /auth", 400
     
     scrobble_object = create_scrobble_object(payload)
@@ -50,10 +46,9 @@ def hook_receiver():
         return "Unable to form trakt request.", 500
     scrobble_object.update({
         "progress": 100,
-        "app_version": VERSION,
-
     })
-    headers = {"Authorization": "Bearer {}".format(access_token)}
+    
+    headers = {"Authorization": "Bearer {}".format(get_access_token())}
     headers.update(HEADERS)
     requests.post(
         TRAKT_API_URL + SCROBBLE_STOP,
@@ -183,7 +178,7 @@ def poll_auth_status(device_code, interval, end_time):
     logger.info("Saved token data")
     return ""
 
-def refresh_token(token_data):
+def refresh_token():
     logger.info("Refresh token")
     request_body = {
         "refresh_token": get_refresh_token(),

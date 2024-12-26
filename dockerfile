@@ -3,7 +3,7 @@ FROM python:3.13-alpine3.21
 ARG CLIENT_ID
 ARG CLIENT_SECRET
 
-VOLUME /opt/trex/conf
+VOLUME /conf
 
 WORKDIR /usr/src/app
 
