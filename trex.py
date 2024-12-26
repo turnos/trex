@@ -1,46 +1,57 @@
-import pathlib
 import re
 import time
 
-import click
 from flask import Flask, request, json
+from token_data import *
 import requests
-import yaml
+import os
+import threading
 
 
 app = Flask(__name__)
+logger = app.logger
 
-VERSION = "0.9"
 TRAKT_API_URL = "https://api.trakt.tv/"
-CLIENT_ID = "8c71f6ec3edb171968a4eda044b69d448edc64c0796f33a4ebf35d3e109138be"
-CLIENT_SECRET = "a5320f59bbde92a36488560fb0b41a93730b36e4707b20371b39c194953bbe42"
-CONFIG_FILE = None
+SCROBBLE_START = "scrobble/start"
+SCROBBLE_PAUSE = "scrobble/pause"
+SCROBBLE_STOP = "scrobble/stop"
+OAUTH_TOKEN = "oauth/token"
+OAUTH_DEVICE_TOKEN = "oauth/device/token"
+OAUTH_DEVICE_CODE = "oauth/device/code"
+REDIRECT_URI = "urn:ietf:wg:oauth:2.0:oob"
+CLIENT_ID = os.environ['CLIENT_ID']
+CLIENT_SECRET = os.environ['CLIENT_SECRET']
 HEADERS = {"trakt-api-version": "2", "trakt-api-key": CLIENT_ID}
 
 
+
+def run():
+    app.logger.setLevel("INFO")
+    app.run(host="0.0.0.0")
+
 @app.route("/trakt_hook", methods=["POST"])
 def hook_receiver():
-    config = load_config()
     payload = json.loads(request.form["payload"])
     # Let's only handle the scrobble event for now.
     if payload["event"] != "media.scrobble":
         return ""
-    plex_user = payload["Account"]["title"]
-    if plex_user not in config:
-        return "Plex user not configured"
-    access_token = config[plex_user]["access_token"]
+    
+    if is_valid() and is_expired():
+        refresh_token()
+    elif not is_valid():
+        return "App is not authenticated with trakt. Please initialize authentication first on /auth", 400
+    
     scrobble_object = create_scrobble_object(payload)
     if not scrobble_object:
         return "Unable to form trakt request.", 500
     scrobble_object.update({
         "progress": 100,
-        "app_version": VERSION,
-
     })
-    headers = {"Authorization": "Bearer {}".format(access_token)}
+    
+    headers = {"Authorization": "Bearer {}".format(get_access_token())}
     headers.update(HEADERS)
     requests.post(
-        TRAKT_API_URL + 'scrobble/stop',
+        TRAKT_API_URL + SCROBBLE_STOP,
         json=scrobble_object,
         headers=headers
     )
@@ -77,84 +88,114 @@ def create_scrobble_object(plex_payload):
     return result or None
 
 
-def load_config():
-    configfile = pathlib.Path(CONFIG_FILE)
-    with configfile.open('r') as f:
-        return yaml.safe_load(f.read())
 
-
-def save_config(config):
-    configfile = pathlib.Path(CONFIG_FILE)
-    with configfile.open('w') as f:
-        return yaml.dump(config, f, default_flow_style=False)
-
-
-@click.group()
-@click.option('--config', '-c', default='./trex.yaml')
-def cli(config):
-    global CONFIG_FILE
-    CONFIG_FILE = config
-
-
-@cli.command()
-def run():
-    app.run(host="0.0.0.0")
-
-
-@cli.command()
-@click.argument('username', required=False)
-def authenticate(username=None):
-    if not username:
-        username = click.prompt("Enter plex username")
-    data = {'client_id': CLIENT_ID}
+@app.route("/auth", methods=["GET"])
+def authenticate():
+    logger.info("Start app registration.")
+    request_body = {"client_id": CLIENT_ID}
     try:
-        r = requests.post(TRAKT_API_URL + 'oauth/device/code', data=data).json()
-        device_code = r['device_code']
-        user_code = r['user_code']
-        expires_in = r['expires_in']
-        interval = r['interval']
+        r = requests.post(TRAKT_API_URL + OAUTH_DEVICE_CODE, data=request_body).json()
 
-        click.echo('Please visit {0} and authorize Flexget. Your user code is {1}. Your code expires in '
-                '{2} minutes.'.format(r['verification_url'], user_code, expires_in / 60.0))
+        logger.debug("Received response %s", r)
+        user_code = r["user_code"]
+        verification_url = r["verification_url"]
+        device_code = r["device_code"]
+        interval = r["interval"]
+        expires_in = r["expires_in"]
 
-        data['code'] = device_code
-        data['client_secret'] = CLIENT_SECRET
-        end_time = time.time() + expires_in
-        click.echo('Waiting...', nl=False)
-        result = None
-        # stop polling after expires_in seconds
-        while time.time() < end_time:
-            time.sleep(interval)
-            polling_request = requests.post(TRAKT_API_URL + 'oauth/device/token', data=data)
-            if polling_request.status_code == 200:  # success
-                result = polling_request.json()
-                break
-            elif polling_request.status_code == 400:  # pending -- waiting for user
-                click.echo('...', nl=False)
-            elif polling_request.status_code == 404:  # not found -- invalid device_code
-                click.echo('Invalid device code.')
-                break
-            elif polling_request.status_code == 409:  # already used -- user already approved
-                click.echo('User code has already been approved.')
-                break
-            elif polling_request.status_code == 410:  # expired -- restart process
-                break
-            elif polling_request.status_code == 418:  # denied -- user denied code
-                click.echo('User code has been denied.')
-                break
-            elif polling_request.status_code == 429:  # polling too fast
-                click.echo('Polling too quickly. Upping the interval. No action required.')
-                interval += 1
-        if not result:
-            click.echo('Unable to authenticate. Please try again.')
-            return
+        expires_in_min = expires_in / 60
+        logger.info(
+            "Received user_code %s. Code expires in %d minutes. User needs to authenticate device on %s",
+            user_code,
+            expires_in_min,
+            verification_url,
+        )
+
+        threading.Thread(
+            target=poll_auth_status,
+            name="Authorization_Polling",
+            args=(device_code, interval, time.time() + expires_in),
+        ).start()
+        logger.info("Started background polling for authorization status")
+
+        response = f'Please visit <a href="{verification_url}/{user_code}">{verification_url}</a> and use code {user_code} to authenticate this app on trakt.tv within the next {expires_in_min} minutes.'
+        logger.debug("Send response to user: %s", response)
+        return response
     except requests.RequestException as e:
-        click.echo('Device authorization with Trakt.tv failed: {0}'.format(e))
+        logger.exception("Device authorization with trakt.tv failed: ", e)
+    return ""
+
+def poll_auth_status(device_code, interval, end_time):
+    logger.info("Start polling for authorization..")
+
+    request_body = {
+        "code": device_code,
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+    }
+    logger.debug("Construct request body: %s", request_body)
+
+    while time.time() < end_time:
+        logger.info("Wait %d seconds before polling authorization status", interval)
+        time.sleep(interval)
+
+        r = requests.post(TRAKT_API_URL + OAUTH_DEVICE_TOKEN, data=request_body)
+        result = None
+
+        if r.status_code == 200:
+            logger.info("Authorization successful!")
+            result = r.json()
+            logger.debug("Received response %s", result)
+            break
+        elif r.status_code == 400:
+            logger.info("Waiting for user to register device")
+        elif r.status_code == 404:
+            logger.error(
+                "Device_code %s is not known to trakt.tv. Authorization failed, stop polling.",
+                device_code,
+            )
+            break
+        elif r.status_code == 409:
+            logger.info(
+                "Device_code %s is already registered, stop polling", device_code
+            )
+            break
+        elif r.status_code == 410:
+            logger.info("Authorization request expired. Restart Authorization process")
+            break
+        elif r.status_code == 418:
+            logger.info("User denied this device. Stop polling.")
+            break
+        elif r.status_code == 429:
+            logger.warning("Polling is too fast, increasing interval by 1 second")
+            interval += 1
+
+    if not result:
+        logger.error("Failed to poll authorization status, please try again")
         return
-    config = load_config()
-    config[username] = result
-    save_config(config)
 
+    save_token_data(result)
+    logger.info("Saved token data")
+    return ""
 
+def refresh_token():
+    logger.info("Refresh token")
+    request_body = {
+        "refresh_token": get_refresh_token(),
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "redirect_uri": REDIRECT_URI,
+        "grant_type": "refresh_token" 
+    }
+    try:
+        r = requests.post(TRAKT_API_URL + OAUTH_TOKEN, data=request_body).json()
+        logger.debug("Received response: %s", r)
+        save_token_data(r)
+        logger.info("Saved new token")
+        return True
+    except requests.RequestException as e:
+        logger.exception("Failed to refresh token", e)
+    return False
+    
 if __name__ == "__main__":
-    cli(obj={})
+    run()
