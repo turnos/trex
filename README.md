@@ -15,7 +15,7 @@ docker run --name Trex -d \
 	--env 'CLIENT_ID=<your_client_id>' \
 	--env 'CLIENT_SECRET=<your_client_secret>' \
 	--volume /mnt/cache/appdata/trex:/conf \
-	turnos/trex
+	ghcr.io/turnos/trex
 ```
 
 ## Usage
