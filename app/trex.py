@@ -67,26 +67,28 @@ def create_scrobble_object(plex_payload):
         movie["title"] = plex_payload["Metadata"]["title"]
         movie["year"] = plex_payload["Metadata"]["year"]
         imdb_match = re.match(
-            r"imdb://(?P<imdb_id>tt\d+)", plex_payload["Metadata"]["guid"]
+            r"imdb://(?P<imdb_id>tt\d+)", plex_payload["Metadata"]["Guid"]
         )
         if imdb_match:
             movie["ids"] = {"imdb": imdb_match.group("imdb_id")}
     elif plex_payload["Metadata"]["type"] == "episode":
-        show = result["show"] = {}
         episode = result["episode"] = {}
-        show["title"] = plex_payload["Metadata"]["grandparentTitle"]
+        ids = episode["ids"] = {}
         episode["title"] = plex_payload["Metadata"]["title"]
         
-        tvdb_match = re.match(
-            r"tvdb://(?P<tvdb_id>\d+)",
-            plex_payload["Metadata"]["guid"],
-        )
+        tvdb_match = re.match(r"tvdb://(?P<tvdb_id>\d+)", plex_payload["Metadata"]["Guid"])
+        
+        imdb_match = re.match(r"imdb://(?P<imdb_id>tt\d+)", plex_payload["Metadata"]["Guid"])
 
         if tvdb_match:
-            show["ids"] = {"tvdb": int(tvdb_match.group("tvdb_id"))}
-        else:
-            episode["season"] = plex_payload["Metadata"]["parentIndex"]
-            episode["number"] = plex_payload["Metadata"]["index"]
+            ids.update({"tvdb": int(tvdb_match.group("tvdb_id"))})
+        
+        if imdb_match:
+            ids.update({"imdb": imdb_match.group("imdb_id")})
+            
+        if not tvdb_match and not imdb_match:
+            result = {}
+        
     return result or None
 
 
