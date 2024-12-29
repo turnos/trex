@@ -85,8 +85,9 @@ def create_scrobble_object(plex_payload):
         
         if imdb_match:
             ids.update({"imdb": imdb_match.group("imdb_id")})
-            
-        if not tvdb_match and not imdb_match:
+        
+        logger.debug("episode ids: %s", ids)
+        if not ids:
             result = {}
         
     return result or None
