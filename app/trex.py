@@ -34,7 +34,7 @@ def hook_receiver():
     payload = json.loads(request.form["payload"])
     # Let's only handle the scrobble event for now.
     if payload["event"] != "media.scrobble":
-        logger.debug("payload is not scrobble: " + payload)
+        logger.debug("payload is not scrobble: " + str(payload))
         return ""
     
     if is_valid() and is_expired():
@@ -44,7 +44,7 @@ def hook_receiver():
     
     scrobble_object = create_scrobble_object(payload)
     if not scrobble_object:
-        logger.info("Unable to form trakt request from payload: " + payload["Metadata"])
+        logger.info("Unable to form trakt request from payload: " + str(payload["Metadata"]))
         return "Unable to form trakt request.", 500
     
     scrobble_object.update({
