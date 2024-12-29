@@ -76,6 +76,8 @@ def create_scrobble_object(plex_payload):
         ids = episode["ids"] = {}
         episode["title"] = plex_payload["Metadata"]["title"]
         
+        logger.debug("Guids in payload:  %s", str(plex_payload["Metadata"]["Guid"]))
+        
         tvdb_match = re.match(r"tvdb://(?P<tvdb_id>\d+)", str(plex_payload["Metadata"]["Guid"]))
         
         imdb_match = re.match(r"imdb://(?P<imdb_id>tt\d+)", str(plex_payload["Metadata"]["Guid"]))
