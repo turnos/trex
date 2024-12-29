@@ -50,6 +50,7 @@ def hook_receiver():
     scrobble_object.update({
         "progress": 100,
     })
+    logger.debug("Scrobble-Object: %s", scrobble_object)
     
     headers = {"Authorization": "Bearer {}".format(get_access_token())}
     headers.update(HEADERS)
