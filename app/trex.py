@@ -53,11 +53,9 @@ def hook_receiver():
     
     headers = {"Authorization": "Bearer {}".format(get_access_token())}
     headers.update(HEADERS)
-    requests.post(
-        TRAKT_API_URL + SCROBBLE_STOP,
-        json=scrobble_object,
-        headers=headers
-    )
+    response = requests.post(TRAKT_API_URL + SCROBBLE_STOP, json=scrobble_object, headers=headers)
+    logger.info("Trakt.tv response code: %d", response.status_code)
+    logger.debug("Trakt.tv Response: %s", response)
     return ""
 
 
