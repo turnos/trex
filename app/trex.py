@@ -11,6 +11,9 @@ import threading
 app = Flask(__name__)
 logger = app.logger
 
+LOG_LEVEL = os.environ['LOG_LEVEL']
+CLIENT_ID = os.environ['CLIENT_ID']
+CLIENT_SECRET = os.environ['CLIENT_SECRET']
 TRAKT_API_URL = "https://api.trakt.tv/"
 SCROBBLE_START = "scrobble/start"
 SCROBBLE_PAUSE = "scrobble/pause"
@@ -19,14 +22,11 @@ OAUTH_TOKEN = "oauth/token"
 OAUTH_DEVICE_TOKEN = "oauth/device/token"
 OAUTH_DEVICE_CODE = "oauth/device/code"
 REDIRECT_URI = "urn:ietf:wg:oauth:2.0:oob"
-CLIENT_ID = os.environ['CLIENT_ID']
-CLIENT_SECRET = os.environ['CLIENT_SECRET']
 HEADERS = {"trakt-api-version": "2", "trakt-api-key": CLIENT_ID}
 
 
-
 def run():
-    app.logger.setLevel("INFO")
+    app.logger.setLevel(LOG_LEVEL)
     app.run(host="0.0.0.0")
 
 @app.route("/trakt_hook", methods=["POST"])
@@ -34,6 +34,7 @@ def hook_receiver():
     payload = json.loads(request.form["payload"])
     # Let's only handle the scrobble event for now.
     if payload["event"] != "media.scrobble":
+        logger.debug("payload is not scrobble: " + payload)
         return ""
     
     if is_valid() and is_expired():
@@ -43,7 +44,9 @@ def hook_receiver():
     
     scrobble_object = create_scrobble_object(payload)
     if not scrobble_object:
+        logger.info("Unable to form trakt request from payload: " + payload["Metadata"])
         return "Unable to form trakt request.", 500
+    
     scrobble_object.update({
         "progress": 100,
     })
