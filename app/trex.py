@@ -76,9 +76,9 @@ def create_scrobble_object(plex_payload):
         ids = episode["ids"] = {}
         episode["title"] = plex_payload["Metadata"]["title"]
         
-        tvdb_match = re.match(r"tvdb://(?P<tvdb_id>\d+)", plex_payload["Metadata"]["Guid"])
+        tvdb_match = re.match(r"tvdb://(?P<tvdb_id>\d+)", str(plex_payload["Metadata"]["Guid"]))
         
-        imdb_match = re.match(r"imdb://(?P<imdb_id>tt\d+)", plex_payload["Metadata"]["Guid"])
+        imdb_match = re.match(r"imdb://(?P<imdb_id>tt\d+)", str(plex_payload["Metadata"]["Guid"]))
 
         if tvdb_match:
             ids.update({"tvdb": int(tvdb_match.group("tvdb_id"))})
