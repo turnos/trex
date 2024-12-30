@@ -78,15 +78,13 @@ def create_scrobble_object(plex_payload):
         
         logger.debug("Guids in payload:  %s", str(plex_payload["Metadata"]["Guid"]))
         
-        tvdb_match = re.match(r"tvdb://(?P<tvdb_id>\d+)", str(plex_payload["Metadata"]["Guid"]))
-        
-        imdb_match = re.match(r"imdb://(?P<imdb_id>tt\d+)", str(plex_payload["Metadata"]["Guid"]))
-
+        tvdb_match = re.search(r"tvdb://(?P<tvdb_id>\d+)", str(plex_payload["Metadata"]["Guid"]))
         if tvdb_match:
-            ids.update({"tvdb": int(tvdb_match.group("tvdb_id"))})
+            ids["tvdb"] = int(tvdb_match.group("tvdb_id"))
         
+        imdb_match = re.search(r"imdb://(?P<imdb_id>tt\d+)", str(plex_payload["Metadata"]["Guid"]))        
         if imdb_match:
-            ids.update({"imdb": imdb_match.group("imdb_id")})
+            ids["imdb"] = imdb_match.group("imdb_id")
         
         logger.debug("episode ids: %s", ids)
         if not ids:
