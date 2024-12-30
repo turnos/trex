@@ -3,6 +3,7 @@ import time
 
 from flask import Flask, request, json
 from token_data import *
+from trakt import create_scrobble_object
 import requests
 import os
 import threading
@@ -58,41 +59,6 @@ def hook_receiver():
     logger.info("Trakt.tv response code: %d", response.status_code)
     logger.debug("Trakt.tv Response: %s", response)
     return ""
-
-
-def create_scrobble_object(plex_payload):
-    result = {}
-    if plex_payload["Metadata"]["type"] == "movie":
-        movie = result["movie"] = {}
-        movie["title"] = plex_payload["Metadata"]["title"]
-        movie["year"] = plex_payload["Metadata"]["year"]
-        imdb_match = re.match(
-            r"imdb://(?P<imdb_id>tt\d+)", plex_payload["Metadata"]["Guid"]
-        )
-        if imdb_match:
-            movie["ids"] = {"imdb": imdb_match.group("imdb_id")}
-    elif plex_payload["Metadata"]["type"] == "episode":
-        episode = result["episode"] = {}
-        ids = episode["ids"] = {}
-        episode["title"] = plex_payload["Metadata"]["title"]
-        
-        logger.debug("Guids in payload:  %s", str(plex_payload["Metadata"]["Guid"]))
-        
-        tvdb_match = re.search(r"tvdb://(?P<tvdb_id>\d+)", str(plex_payload["Metadata"]["Guid"]))
-        if tvdb_match:
-            ids["tvdb"] = int(tvdb_match.group("tvdb_id"))
-        
-        imdb_match = re.search(r"imdb://(?P<imdb_id>tt\d+)", str(plex_payload["Metadata"]["Guid"]))        
-        if imdb_match:
-            ids["imdb"] = imdb_match.group("imdb_id")
-        
-        logger.debug("episode ids: %s", ids)
-        if not ids:
-            result = {}
-        
-    return result or None
-
-
 
 @app.route("/auth", methods=["GET"])
 def authenticate():
