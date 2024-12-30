@@ -1,4 +1,3 @@
-import re
 import time
 
 from flask import Flask, request, json
@@ -35,7 +34,7 @@ def hook_receiver():
     payload = json.loads(request.form["payload"])
     # Let's only handle the scrobble event for now.
     if payload["event"] != "media.scrobble":
-        logger.debug("payload is not scrobble: " + str(payload))
+        logger.debug("Payload is not scrobble: %s", str(payload["event"]))
         return ""
     
     if is_valid() and is_expired():

@@ -30,9 +30,14 @@ def create_scrobble_object(plex_payload):
             result = {}
             
     elif plex_payload["Metadata"]["type"] == "episode":
+        show = result["show"] = {}
+        show["title"] = plex_payload["Metadata"]["grandparentTitle"]
+        show["ids"]["slug"] = plex_payload["grandparentSlug"]
         episode = result["episode"] = {}
-        ids = episode["ids"] = {}
         episode["title"] = plex_payload["Metadata"]["title"]
+        episode["season"] = plex_payload["Metadata"]["parentIndex"]
+        episode["number"] = plex_payload["Metadata"]["index"]
+        ids = episode["ids"] = {}
         
         guids = str(plex_payload["Metadata"]["Guid"])
         
