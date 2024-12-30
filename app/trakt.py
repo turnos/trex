@@ -14,7 +14,7 @@ def create_scrobble_object(plex_payload):
         movie["title"] = plex_payload["Metadata"]["title"]
         movie["year"] = plex_payload["Metadata"]["year"]
         
-        guids = str(plex_payload["Metdata"]["Guid"])
+        guids = str(plex_payload["Metadata"]["Guid"])
         logger.debug("Guids in payload:  %s", guids)
                 
         imdb_id = search_imdb_id(guids)      
@@ -34,7 +34,7 @@ def create_scrobble_object(plex_payload):
         ids = episode["ids"] = {}
         episode["title"] = plex_payload["Metadata"]["title"]
         
-        guids = str(plex_payload["Metdata"]["Guid"])
+        guids = str(plex_payload["Metadata"]["Guid"])
         
         logger.debug("Guids in payload:  %s", guids)
         
