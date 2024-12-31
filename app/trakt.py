@@ -8,13 +8,15 @@ logger.setLevel(os.environ['LOG_LEVEL'])
 
 def create_scrobble_object(plex_payload):
     result = {}
-    if plex_payload["Metadata"]["type"] == "movie":
+    
+    metadata = plex_payload["Metadata"]
+    if metadata["type"] == "movie":
         movie = result["movie"] = {}
         ids = movie["ids"] = {}
-        movie["title"] = plex_payload["Metadata"]["title"]
-        movie["year"] = plex_payload["Metadata"]["year"]
+        movie["title"] = metadata["title"]
+        movie["year"] = metadata["year"]
         
-        guids = str(plex_payload["Metadata"]["Guid"])
+        guids = str(metadata["Guid"])
         logger.debug("Guids in payload:  %s", guids)
                 
         imdb_id = search_imdb_id(guids)      
@@ -26,21 +28,23 @@ def create_scrobble_object(plex_payload):
             ids["tmdb"] = tmdb_id
             
         logger.debug("movie ids: %s", ids)
-        if not id:
-            result = {}
             
-    elif plex_payload["Metadata"]["type"] == "episode":
+    elif metadata["type"] == "episode":
         show = result["show"] = {}
-        show_ids = show["ids"] = {}
-        show["title"] = plex_payload["Metadata"]["grandparentTitle"]
-        show_ids["slug"] = plex_payload["Metadata"]["grandparentSlug"]
+
+        if "grandparentSlug" in metadata:
+            show_ids = show["ids"] = {}
+            show_ids["slug"] = metadata["grandparentSlug"]
+        
+        show["title"] = metadata["grandparentTitle"]
+
         episode = result["episode"] = {}
-        episode["title"] = plex_payload["Metadata"]["title"]
-        episode["season"] = plex_payload["Metadata"]["parentIndex"]
-        episode["number"] = plex_payload["Metadata"]["index"]
+        episode["title"] = metadata["title"]
+        episode["season"] = metadata["parentIndex"]
+        episode["number"] = metadata["index"]
         ids = episode["ids"] = {}
         
-        guids = str(plex_payload["Metadata"]["Guid"])
+        guids = str(metadata["Guid"])
         
         logger.debug("Guids in payload:  %s", guids)
         
@@ -57,8 +61,6 @@ def create_scrobble_object(plex_payload):
             ids["tmdb"] = tmdb_id
         
         logger.debug("episode ids: %s", ids)
-        if not ids:
-            result = {}
         
     return result or None
 
