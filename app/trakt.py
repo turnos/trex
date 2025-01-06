@@ -12,22 +12,23 @@ def create_scrobble_object(plex_payload):
     logger.debug("Metadata: %s", metadata)
     if metadata["type"] == "movie":
         movie = result["movie"] = {}
-        ids = movie["ids"] = {}
         movie["title"] = metadata["title"]
         movie["year"] = metadata["year"]
         
-        guids = str(metadata["Guid"])
-        logger.debug("Guids in payload:  %s", guids)
+        if "Guid" in metadata:
+            ids = movie["ids"] = {}
+            guids = str(metadata["Guid"])
+            logger.debug("Guids in payload:  %s", guids)
                 
-        imdb_id = search_imdb_id(guids)      
-        if imdb_id:
-            ids["imdb"] = imdb_id
+            imdb_id = search_imdb_id(guids)      
+            if imdb_id:
+                ids["imdb"] = imdb_id
             
-        tmdb_id = search_tmdb_id(guids)
-        if tmdb_id:
-            ids["tmdb"] = tmdb_id
+            tmdb_id = search_tmdb_id(guids)
+            if tmdb_id:
+                ids["tmdb"] = tmdb_id
             
-        logger.debug("movie ids: %s", ids)
+            logger.debug("movie ids: %s", ids)
             
     elif metadata["type"] == "episode":
         show = result["show"] = {}
@@ -42,25 +43,28 @@ def create_scrobble_object(plex_payload):
         episode["title"] = metadata["title"]
         episode["season"] = metadata["parentIndex"]
         episode["number"] = metadata["index"]
-        ids = episode["ids"] = {}
         
-        guids = str(metadata["Guid"])
-        
-        logger.debug("Guids in payload:  %s", guids)
-        
-        tvdb_id = search_tvdb_id(guids)
-        if tvdb_id:
-            ids["tvdb"] = tvdb_id
-        
-        imdb_id = search_imdb_id(guids)      
-        if imdb_id:
-            ids["imdb"] = imdb_id
+        if "Guid" in metadata:
             
-        tmdb_id = search_tmdb_id(guids)
-        if tmdb_id:
-            ids["tmdb"] = tmdb_id
+            ids = episode["ids"] = {}
         
-        logger.debug("episode ids: %s", ids)
+            guids = str(metadata["Guid"])
+        
+            logger.debug("Guids in payload:  %s", guids)
+        
+            tvdb_id = search_tvdb_id(guids)
+            if tvdb_id:
+                ids["tvdb"] = tvdb_id
+        
+            imdb_id = search_imdb_id(guids)      
+            if imdb_id:
+                ids["imdb"] = imdb_id
+            
+            tmdb_id = search_tmdb_id(guids)
+            if tmdb_id:
+                ids["tmdb"] = tmdb_id
+        
+            logger.debug("episode ids: %s", ids)
         
     return result or None
 
