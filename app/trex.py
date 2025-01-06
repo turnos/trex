@@ -8,7 +8,7 @@ import os
 import threading
 
 
-app = Flask(__name__)
+app = Flask('trex')
 logger = app.logger
 
 LOG_LEVEL = os.environ['LOG_LEVEL']

@@ -2,7 +2,7 @@ import re
 import logging
 import os
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('trex')
 logger.setLevel(os.environ['LOG_LEVEL'])
 
 
