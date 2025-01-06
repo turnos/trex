@@ -9,7 +9,7 @@ logger.setLevel(os.environ['LOG_LEVEL'])
 def create_scrobble_object(plex_payload):
     result = {}
     metadata = plex_payload["Metadata"]
-    logger.debug("Metadata: %s", metadata)
+    logger.debug("Metadata: %s", str(metadata))
     if metadata["type"] == "movie":
         movie = result["movie"] = {}
         movie["title"] = metadata["title"]
